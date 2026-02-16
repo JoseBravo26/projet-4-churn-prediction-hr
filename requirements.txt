@@ -9,3 +9,5 @@ plotly==6.5.2
 shap==0.50.0
 joblib
 jupyter
+pytest
+ruff 
