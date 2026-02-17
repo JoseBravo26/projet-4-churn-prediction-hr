@@ -1,6 +1,5 @@
 pandas==2.2.2
 numpy==1.26.4
-catboost==1.2.8
 scikit-learn==1.5.2
 imbalanced-learn>=0.12.0
 matplotlib==3.10.8
@@ -11,3 +10,6 @@ joblib
 jupyter
 pytest
 ruff 
+gradio==4.44.0
+joblib
+
