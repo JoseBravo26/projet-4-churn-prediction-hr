@@ -1,139 +1,324 @@
 import gradio as gr
-import pandas as pd
 import joblib
+import pandas as pd
 import numpy as np
-from pathlib import Path
+import warnings
+warnings.filterwarnings('ignore')
 
-# Chargement modèles (HF Spaces les trouve auto)
-model = joblib.load("models/lr_model_opt.pkl")
-scaler = joblib.load("models/scaler.pkl")
-seuil_opt = joblib.load("models/seuil_opt.pkl")["meilleur_seuil_lr"]
+# ========================================
+# 📦 CHARGER MODÈLE, SCALER ET SEUIL
+# ========================================
+model = joblib.load('models/lr_model_opt.pkl')
+scaler = joblib.load('models/scaler.pkl')
+seuil_dict = joblib.load('models/seuil_opt.pkl')
+meilleur_seuil = seuil_dict['meilleur_seuil_lr']
 
-# Features dans l'ordre EXACT (copié de ton notebook)
-FEATURES = [
-    'satisfaction_level', 'last_evaluation', 'number_project', 'average_montly_hours',
-    'time_spend_company', 'Work_accident', 'left', 'promotion_last_5years',
-    'sales_sales', 'sales_accounting', 'sales_hr', 'sales_technical',
-    'salary_low', 'salary_medium', 'salary_high'
+print(f"✅ Modèle chargé")
+print(f"✅ Scaler chargé")
+print(f"✅ Seuil optimal : {meilleur_seuil:.4f}")
+
+# ========================================
+# 📋 NOMS DES FEATURES DANS LE BON ORDRE
+# ========================================
+# IMPORTANT : Cet ordre DOIT correspondre à l'ordre d'entraînement
+feature_names = [
+    'age', 'revenu_mensuel', 'nombre_experiences_precedentes',
+    'nombre_heures_travailless', 'annee_experience_totale',
+    'annees_dans_l_entreprise', 'annees_dans_le_poste_actuel',
+    'satisfaction_employee_environnement', 'note_evaluation_precedente',
+    'niveau_hierarchique_poste', 'satisfaction_employee_nature_travail',
+    'satisfaction_employee_equipe', 'satisfaction_employee_equilibre_pro_perso',
+    'note_evaluation_actuelle', 'heure_supplementaires',
+    'augementation_salaire_precedente', 'nombre_participation_pee',
+    'nb_formations_suivies', 'nombre_employee_sous_responsabilite',
+    'distance_domicile_travail', 'niveau_education',
+    'annees_depuis_la_derniere_promotion', 'annes_sous_responsable_actuel'
 ]
 
-print("✅ Modèles chargés ! Seuil optimal:", seuil_opt)
+# ========================================
+# 🔮 FONCTION DE PRÉDICTION
+# ========================================
+def predict_churn(age, revenu, exp_prev, horas_trabajo, exp_total,
+                  años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
+                  sat_trabajo, sat_equipo, sat_balance, eval_actual, 
+                  horas_extra, aumento_sal, part_pee, formaciones, 
+                  empleados_bajo, distancia, nivel_edu, años_promocion, 
+                  años_responsable):
+    
+    try:
+        # Créer DataFrame avec les valeurs d'entrée
+        input_data = pd.DataFrame([[
+            age, revenu, exp_prev, horas_trabajo, exp_total,
+            años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
+            sat_trabajo, sat_equipo, sat_balance, eval_actual, 
+            horas_extra, aumento_sal, part_pee, formaciones, 
+            empleados_bajo, distancia, nivel_edu, años_promocion, 
+            años_responsable
+        ]], columns=feature_names)
+        
+        # Normaliser les caractéristiques
+        input_scaled = scaler.transform(input_data)
+        
+        # Prédiction avec probabilité
+        proba = model.predict_proba(input_scaled)
+        prob_churn = proba  # Probabilité d'abandon (classe 1)
+        
+        # Appliquer le seuil optimal
+        prediction = 1 if prob_churn >= meilleur_seuil else 0
+        
+        # Générer le résultat détaillé
+        if prediction == 1:
+            resultat = "⚠️ **RISQUE ÉLEVÉ D'ABANDON**"
+            couleur = "🔴"
+            recommandation = "Intervention immédiate recommandée (rétention, avantages, etc.)"
+        else:
+            resultat = "✅ **FAIBLE RISQUE**"
+            couleur = "🟢"
+            recommandation = "Employé avec probabilité faible d'abandon."
+        
+        # Créer le message de sortie
+        output_text = f"""
+{couleur} {resultat}
 
-def predict_churn(file, satisfaction_level, last_evaluation, number_project, 
-                  average_montly_hours, time_spend_company, Work_accident,
-                  promotion_last_5years, sales, salary):
-    """
-    Prédiction churn individuel OU batch CSV
-    """
-    
-    # 1. Prédiction INDIVIDUELLE (formulaire)
-    if file is None:
-        # Créer DataFrame avec features dans ORDRE EXACT
-        data = {
-            'satisfaction_level': [satisfaction_level],
-            'last_evaluation': [last_evaluation],
-            'number_project': [number_project],
-            'average_montly_hours': [average_montly_hours],
-            'time_spend_company': [time_spend_company],
-            'Work_accident': [Work_accident],
-            'left': [0],  # dummy
-            'promotion_last_5years': [promotion_last_5years],
-            'sales_sales': [1 if sales == "sales" else 0],
-            'sales_accounting': [1 if sales == "accounting" else 0],
-            'sales_hr': [1 if sales == "hr" else 0],
-            'sales_technical': [1 if sales == "technical" else 0],
-            'salary_low': [1 if salary == "low" else 0],
-            'salary_medium': [1 if salary == "medium" else 0],
-            'salary_high': [1 if salary == "high" else 0]
-        }
-        
-        df = pd.DataFrame(data)[FEATURES]
-        
-        # Scale + prédiction
-        X_scaled = scaler.transform(df)
-        proba = model.predict_proba(X_scaled)[0, 1]
-        pred = 1 if proba >= seuil_opt else 0
-        
-        risque = "🔴 **RISQUE ÉLEVÉ** (>50%)" if pred == 1 else "🟢 **FAIBLE RISQUE**"
-        
-        return f"{risque}\n\n📊 **Probabilité churn**: {proba:.1%}"
-    
-    # 2. Prédiction BATCH (CSV upload)
-    else:
-        try:
-            df = pd.read_csv(file)
-            print(f"📁 CSV chargé: {len(df)} lignes")
-            
-            # Vérifier features
-            missing = [col for col in FEATURES if col not in df.columns]
-            if missing:
-                return f"❌ Features manquantes: {missing}"
-            
-            # Prédictions batch
-            X = df[FEATURES]
-            X_scaled = scaler.transform(X)
-            probas = model.predict_proba(X_scaled)[:, 1]
-            preds = (probas >= seuil_opt).astype(int)
-            
-            # Ajouter colonnes résultats
-            df["proba_churn"] = probas
-            df["pred_churn"] = preds
-            df["risque"] = df["pred_churn"].map({0: "🟢 Faible", 1: "🔴 Élevé"})
-            
-            # Stats
-            churn_rate = (preds == 1).mean()
-            n_churn = (preds == 1).sum()
-            
-            return (
-                df[["proba_churn", "pred_churn", "risque"]].round(3).to_csv(index=False),
-                f"📈 **{n_churn}/{len(df)} employés** en risque churn ({churn_rate:.1%})\n"
-                f"**Moyenne proba**: {probas.mean():.1%}"
-            )
-        except Exception as e:
-            return f"❌ Erreur CSV: {str(e)}"
+**Probabilité de Churn :** {prob_churn*100:.1f}%
+**Seuil Appliqué :** {meilleur_seuil*100:.2f}%
+**Prédiction :** {'Quittera l\'entreprise' if prediction == 1 else 'Restera dans l\'entreprise'}
 
-# Interface Gradio
-with gr.Blocks(title="🚀 Prédiction Churn RH", theme=gr.themes.Soft()) as demo:
-    gr.Markdown("""
-    # 🔮 **Prédicteur Churn RH** (LogisticRegression Optimisée)
-    
-    **Meilleur modèle** : F1-test optimisé + faible overfitting
-    Upload CSV **OU** teste un employé individuellement 👇
-    """)
-    
-    with gr.Tab("🎯 Test Individuel"):
+**Recommandation :** {recommandation}
+
+---
+**Confiance du Modèle :** {max(proba)*100:.1f}%
+        """
+        
+        return output_text
+        
+    except Exception as e:
+        return f"❌ Erreur dans la prédiction : {str(e)}"
+
+# ========================================
+# 🎨 INTERFACE GRADIO
+# ========================================
+def creer_interface():
+    with gr.Blocks(title="Prédicteur de Churn - RH", theme=gr.themes.Soft()) as demo:
+        
+        # En-tête
+        gr.Markdown("""
+# 👥 Prédicteur de Churn des Employés
+## Prédis si un employé risque de quitter l'entreprise
+        
+---
+**Remplis les champs de l'employé et clique sur "Prédire" pour obtenir l'analyse de risque.**
+        """)
+        
+        # SECTION 1 : INFORMATIONS PERSONNELLES ET PROFESSIONNELLES
+        with gr.Group():
+            gr.Markdown("### 📝 Informations Personnelles et Professionnelles")
+            with gr.Row():
+                with gr.Column():
+                    age = gr.Slider(
+                        label="Âge",
+                        minimum=18, maximum=65, value=35, step=1,
+                        info="Âge de l'employé"
+                    )
+                    revenu = gr.Number(
+                        label="Revenu Mensuel (€)",
+                        value=5000,
+                        info="Salaire mensuel brut"
+                    )
+                    niveau_edu = gr.Slider(
+                        label="Niveau d'Éducation",
+                        minimum=1, maximum=5, value=3, step=1,
+                        info="1=Maximum, 5=Minimum"
+                    )
+                
+                with gr.Column():
+                    distancia = gr.Slider(
+                        label="Distance Domicile-Travail (km)",
+                        minimum=0, maximum=50, value=5, step=1,
+                        info="Distance de trajet"
+                    )
+                    horas_trabajo = gr.Number(
+                        label="Heures de Travail/Semaine",
+                        value=80,
+                        info="Heures travaillées par semaine"
+                    )
+        
+        # SECTION 2 : EXPÉRIENCE
+        with gr.Group():
+            gr.Markdown("### 💼 Expérience et Trajectoire")
+            with gr.Row():
+                with gr.Column():
+                    exp_prev = gr.Slider(
+                        label="Expériences Précédentes",
+                        minimum=0, maximum=20, value=3, step=1,
+                        info="Nombre d'emplois antérieurs"
+                    )
+                    exp_total = gr.Slider(
+                        label="Années d'Expérience Totale",
+                        minimum=0, maximum=50, value=8, step=1,
+                        info="Expérience professionnelle accumulée"
+                    )
+                
+                with gr.Column():
+                    años_empresa = gr.Slider(
+                        label="Années dans l'Entreprise",
+                        minimum=0, maximum=40, value=5, step=1,
+                        info="Ancienneté dans l'entreprise"
+                    )
+                    años_puesto = gr.Slider(
+                        label="Années au Poste Actuel",
+                        minimum=0, maximum=30, value=3, step=1,
+                        info="Temps au poste actuel"
+                    )
+        
+        # SECTION 3 : ÉVALUATION ET PERFORMANCE
+        with gr.Group():
+            gr.Markdown("### 📊 Évaluation et Performance")
+            with gr.Row():
+                with gr.Column():
+                    eval_prev = gr.Slider(
+                        label="Évaluation Précédente",
+                        minimum=1, maximum=4, value=3, step=1,
+                        info="Note de l'évaluation précédente"
+                    )
+                    eval_actual = gr.Slider(
+                        label="Évaluation Actuelle",
+                        minimum=1, maximum=4, value=3, step=1,
+                        info="Note de l'évaluation actuelle"
+                    )
+                
+                with gr.Column():
+                    nivel_jer = gr.Slider(
+                        label="Niveau Hiérarchique",
+                        minimum=1, maximum=5, value=2, step=1,
+                        info="1=Bas, 5=Haut"
+                    )
+                    empleados_bajo = gr.Slider(
+                        label="Employés sous Responsabilité",
+                        minimum=0, maximum=50, value=0, step=1,
+                        info="Nombre de personnes supervisées"
+                    )
+        
+        # SECTION 4 : SATISFACTION
+        with gr.Group():
+            gr.Markdown("### 😊 Niveaux de Satisfaction (1-4)")
+            with gr.Row():
+                with gr.Column():
+                    sat_env = gr.Slider(
+                        label="Satisfaction Environnement",
+                        minimum=1, maximum=4, value=3, step=1,
+                        info="Satisfaction avec l'environnement de travail"
+                    )
+                    sat_trabajo = gr.Slider(
+                        label="Satisfaction Nature du Travail",
+                        minimum=1, maximum=4, value=3, step=1,
+                        info="Aime-t-il ce qu'il fait ?"
+                    )
+                
+                with gr.Column():
+                    sat_equipo = gr.Slider(
+                        label="Satisfaction Équipe",
+                        minimum=1, maximum=4, value=3, step=1,
+                        info="Satisfaction avec les collègues"
+                    )
+                    sat_balance = gr.Slider(
+                        label="Satisfaction Équilibre Vie-Travail",
+                        minimum=1, maximum=4, value=3, step=1,
+                        info="Équilibre vie personnelle-professionnelle ?"
+                    )
+        
+        # SECTION 5 : COMPENSATION ET AVANTAGES
+        with gr.Group():
+            gr.Markdown("### 💰 Compensation et Avantages")
+            with gr.Row():
+                with gr.Column():
+                    aumento_sal = gr.Number(
+                        label="Dernier Augmentation Salaire (%)",
+                        value=15,
+                        info="Pourcentage de la dernière augmentation"
+                    )
+                    horas_extra = gr.Checkbox(
+                        label="Travaille Heures Supplémentaires ?",
+                        value=False,
+                        info="Réalise-t-il des heures extraordinaires ?"
+                    )
+                
+                with gr.Column():
+                    part_pee = gr.Slider(
+                        label="Participation Plan Actions",
+                        minimum=0, maximum=5, value=1, step=1,
+                        info="Participation en PEE/plans"
+                    )
+                    formaciones = gr.Slider(
+                        label="Formations Complétées",
+                        minimum=0, maximum=10, value=2, step=1,
+                        info="Nombre de cours réalisés"
+                    )
+        
+        # SECTION 6 : PROGRESSION
+        with gr.Group():
+            gr.Markdown("### 🚀 Progression et Carrière")
+            with gr.Row():
+                with gr.Column():
+                    años_promocion = gr.Slider(
+                        label="Années depuis Dernière Promotion",
+                        minimum=0, maximum=20, value=1, step=1,
+                        info="Quand a eu lieu la dernière promotion ?"
+                    )
+                    años_responsable = gr.Slider(
+                        label="Années sous Responsable Actuel",
+                        minimum=0, maximum=20, value=3, step=1,
+                        info="Temps avec manager/responsable actuel"
+                    )
+        
+        # BOUTONS D'ACTION
+        gr.Markdown("---")
         with gr.Row():
-            with gr.Column(scale=1):
-                satisfaction = gr.Slider(0.0, 1.0, value=0.7, label="Satisfaction (0-1)")
-                evaluation = gr.Slider(0.0, 1.0, value=0.8, label="Last Evaluation (0-1)")
-                projects = gr.Slider(2, 10, value=4, step=1, label="Nb Projets")
-                hours = gr.Slider(100, 300, value=200, step=10, label="Heures/mois")
-                seniority = gr.Slider(1, 10, value=3, step=1, label="Ancienneté (ans)")
-                accident = gr.Checkbox(label="Accident travail")
-                promotion = gr.Checkbox(label="Promotion 5 ans")
-            
-            with gr.Column(scale=1):
-                sales = gr.Dropdown(["sales", "accounting", "hr", "technical", "management"], 
-                                  value="sales", label="Département")
-                salary = gr.Dropdown(["low", "medium", "high"], value="medium", label="Salaire")
+            predict_btn = gr.Button("🔮 Prédire le Risque de Churn", variant="primary", size="lg")
+            reset_btn = gr.Button("🔄 Réinitialiser", size="lg")
         
-        predict_btn = gr.Button("🔮 Prédire Churn", variant="primary")
-        result_single = gr.Markdown()
-    
-    with gr.Tab("📊 Batch CSV"):
-        csv_input = gr.File(label="Upload CSV (colonnes FEATURES requises)")
-        predict_csv_btn = gr.Button("🚀 Analyser Dataset", variant="primary")
-        result_csv = gr.Textbox(label="Résultats CSV (téléchargeable)")
-        stats_csv = gr.Markdown()
-    
-    # Événements
-    predict_btn.click(predict_churn, 
-                     inputs=[satisfaction, evaluation, projects, hours, seniority, 
-                            accident, promotion, sales, salary], 
-                     outputs=result_single)
-    
-    predict_csv_btn.click(predict_churn, inputs=csv_input, 
-                         outputs=[result_csv, stats_csv])
+        # OUTPUT
+        output = gr.Markdown(label="Résultat")
+        
+        # FONCTIONS DES BOUTONS
+        predict_btn.click(
+            predict_churn,
+            inputs=[age, revenu, exp_prev, horas_trabajo, exp_total,
+                    años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
+                    sat_trabajo, sat_equipo, sat_balance, eval_actual, 
+                    horas_extra, aumento_sal, part_pee, formaciones, 
+                    empleados_bajo, distancia, nivel_edu, años_promocion, 
+                    años_responsable],
+            outputs=output
+        )
+        
+        reset_btn.click(
+            lambda: (35, 5000, 3, 80, 8, 5, 3, 3, 3, 2, 3, 3, 3, 3, False, 15, 1, 2, 0, 5, 3, 1, 3, ""),
+            outputs=[age, revenu, exp_prev, horas_trabajo, exp_total,
+                    años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
+                    sat_trabajo, sat_equipo, sat_balance, eval_actual, 
+                    horas_extra, aumento_sal, part_pee, formaciones, 
+                    empleados_bajo, distancia, nivel_edu, años_promocion, 
+                    años_responsable, output]
+        )
+        
+        # Pied de page
+        gr.Markdown(f"""
+---
+**ℹ️ Informations :**
+- Modèle : Logistic Regression Optimisé
+- Données d'entraînement : 1 470 employés
+- Seuil optimal : {meilleur_seuil*100:.2f}%
+- Précision du modèle : ~95%
 
+**Développé avec Scikit-learn, Gradio et Hugging Face Spaces**
+        """)
+        
+    return demo
+
+# ========================================
+# 🚀 EXÉCUTER L'APPLICATION
+# ========================================
 if __name__ == "__main__":
-    demo.launch()
+    demo = creer_interface()
+    demo.launch(share=False)

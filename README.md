@@ -1,30 +1,54 @@
-# Projet 4 : Prédiction du Churn des Employés (HR Analytics)
+# 👥 Prédicteur de Churn des Employés
 
-Modèle ML CatBoost pour prédire les départs (recall priorisé : 0.57 sur test, ROC-AUC 0.81).
+## 📊 Description
 
-## Installation
-1. Clonez : `git clone https://github.com/votre-user/projet-4-churn-prediction-hr.git`
-2. `cd projet-4-churn-prediction-hr`
-3. `pip install -r requirements.txt`
-4. Lancez notebook : `jupyter notebook notebooks/Projet-4-Churn.ipynb`
+Application de machine learning qui prédit si un employé risque de quitter l'entreprise.
 
-## Usage
-- Entraînez : `python src/model_training.py`
-- Prédisez : `python src/predict.py --data data/test.csv`
+### Caractéristiques du Modèle
+- **Algorithme** : Logistic Regression (Optimisé)
+- **Dataset d'entraînement** : 1 470 employés
+- **Caractéristiques** : 23 variables (âge, salaire, satisfaction, expérience, etc.)
+- **Métrique d'évaluation** : Seuil optimal pour maximum recall
 
-## Résultats
-| Métrique | Test |
-|----------|------|
-| Accuracy | 0.85 |
-| Recall (départs) | 0.57 |
-| F1 | 0.55 |
-| ROC-AUC | 0.81 |
+### Variables d'Entrée
+- 📝 Informations personnelles (âge, éducation, distance)
+- 💼 Expérience et trajectoire
+- 📊 Évaluations et performance
+- 😊 Niveaux de satisfaction
+- 💰 Compensation et avantages
+- 🚀 Progression de carrière
 
-Features clés : satisfaction, tenure, salaire. [file:31]
+## 🚀 Comment Utiliser
 
-## Branches & Tags
-- `main` : Production
-- `develop` : Dev
-- Tags : `v1.0.0`
+1. Remplis tous les champs avec les informations de l'employé
+2. Clique sur **"Prédire le Risque de Churn"**
+3. Obtiens la prédiction avec probabilité d'abandon et recommandations
 
-Licence : MIT
+## 📈 Résultats
+
+La prédiction inclut :
+- **Risque d'abandon** (Élevé/Faible)
+- **Probabilité de churn** (%)
+- **Confiance du modèle**
+- **Recommandations** d'action
+
+## 🛠️ Technologie
+
+- Python 3.8+
+- Scikit-learn (Machine Learning)
+- Gradio (Interface)
+- Joblib (Sérialisation)
+- Hugging Face Spaces (Hébergement)
+
+## 📋 Prérequis
+
+- Navigateur web moderne
+- Connexion Internet
+
+## 👨‍💻 Auteur
+
+[Ton Nom/Entreprise]
+
+## 📄 Licence
+
+MIT
