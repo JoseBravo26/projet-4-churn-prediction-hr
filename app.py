@@ -8,317 +8,336 @@ warnings.filterwarnings('ignore')
 # ========================================
 # 📦 CHARGER MODÈLE, SCALER ET SEUIL
 # ========================================
-model = joblib.load('models/lr_model_opt.pkl')
-scaler = joblib.load('models/scaler.pkl')
-seuil_dict = joblib.load('models/seuil_opt.pkl')
-meilleur_seuil = seuil_dict['meilleur_seuil_lr']
-
-print(f"✅ Modèle chargé")
-print(f"✅ Scaler chargé")
-print(f"✅ Seuil optimal : {meilleur_seuil:.4f}")
+try:
+    modele = joblib.load('models/lr_model_opt.pkl')
+    scaler = joblib.load('models/scaler.pkl')
+    dict_seuil = joblib.load('models/seuil_opt.pkl')
+    meilleur_seuil = dict_seuil['meilleur_seuil_lr']
+    
+    print(f"✅ Modèle chargé")
+    print(f"✅ Scaler chargé")
+    print(f"✅ Seuil optimal : {meilleur_seuil:.4f}")
+    
+    # DÉTECTER LES FEATURES CORRECTS DU MODÈLE
+    if hasattr(scaler, 'feature_names_in_'):
+        noms_features = list(scaler.feature_names_in_)
+        print(f"✅ Features du modèle ({len(noms_features)}): {noms_features[:10]}...")
+    else:
+        noms_features = None
+        print(f"⚠️ Pas de feature_names_in_ détectés")
+        
+except FileNotFoundError as e:
+    print(f"❌ Fichier manquant: {str(e)}")
+    modele = None
+    scaler = None
+    meilleur_seuil = None
+    noms_features = None
+except Exception as e:
+    print(f"❌ Erreur au chargement: {str(e)}")
+    modele = None
+    scaler = None
+    meilleur_seuil = None
+    noms_features = None
 
 # ========================================
-# 📋 NOMS DES FEATURES DANS LE BON ORDRE
+# 🔧 FONCTION DE PRÉTRAITEMENT DES DONNÉES
 # ========================================
-# IMPORTANT : Cet ordre DOIT correspondre à l'ordre d'entraînement
-feature_names = [
-    'age', 'revenu_mensuel', 'nombre_experiences_precedentes',
-    'nombre_heures_travailless', 'annee_experience_totale',
-    'annees_dans_l_entreprise', 'annees_dans_le_poste_actuel',
-    'satisfaction_employee_environnement', 'note_evaluation_precedente',
-    'niveau_hierarchique_poste', 'satisfaction_employee_nature_travail',
-    'satisfaction_employee_equipe', 'satisfaction_employee_equilibre_pro_perso',
-    'note_evaluation_actuelle', 'heure_supplementaires',
-    'augementation_salaire_precedente', 'nombre_participation_pee',
-    'nb_formations_suivies', 'nombre_employee_sous_responsabilite',
-    'distance_domicile_travail', 'niveau_education',
-    'annees_depuis_la_derniere_promotion', 'annes_sous_responsable_actuel'
-]
+def pretraiter_donnees(age, salaire, emplois_precedents, heures_semaine, experience_totale,
+                       annees_entreprise, annees_poste, satisfaction_environnement, evaluation_precedente, 
+                       niveau_hierarchique, satisfaction_travail, satisfaction_equipe, satisfaction_balance, 
+                       evaluation_actuelle, heures_supplementaires, augmentation_salaire, participation_pee, 
+                       formations_completees, employes_supervision, distance, annees_derniere_promotion, 
+                       annees_responsable_actuel, genre, etat_civil, departement, domaine_etude, poste_freq_deplacement):
+    """
+    Crée un DataFrame avec les features TRANSFORMÉES comme le modèle l'attend
+    """
+    
+    # Créer DataFrame avec les données brutes
+    donnees = {
+        'age': [age],
+        'revenu_mensuel': [salaire],
+        'nombre_experiences_precedentes': [emplois_precedents],
+        'nombre_heures_travailless': [heures_semaine],
+        'annee_experience_totale': [experience_totale],
+        'annees_dans_l_entreprise': [annees_entreprise],
+        'annees_dans_le_poste_actuel': [annees_poste],
+        'satisfaction_employee_environnement': [satisfaction_environnement],
+        'note_evaluation_precedente': [evaluation_precedente],
+        'niveau_hierarchique_poste': [niveau_hierarchique],
+        'satisfaction_employee_nature_travail': [satisfaction_travail],
+        'satisfaction_employee_equipe': [satisfaction_equipe],
+        'satisfaction_employee_equilibre_pro_perso': [satisfaction_balance],
+        'note_evaluation_actuelle': [evaluation_actuelle],
+        'heure_supplementaires': [1 if heures_supplementaires else 0],
+        'augementation_salaire_precedente': [augmentation_salaire],
+        'nombre_participation_pee': [participation_pee],
+        'nb_formations_suivies': [formations_completees],
+        'nombre_employee_sous_responsabilite': [employes_supervision],
+        'distance_domicile_travail': [distance],
+        'annees_depuis_la_derniere_promotion': [annees_derniere_promotion],
+        'annes_sous_responsable_actuel': [annees_responsable_actuel],
+        'genre': [1 if genre == "Féminin" else 0],
+        'est_marie': [1 if etat_civil == "Marié(e)" else 0],
+        'departement': [departement],
+        'domaine_etude': [domaine_etude],
+        'freq_deplacement': [poste_freq_deplacement]
+    }
+    
+    df = pd.DataFrame(donnees)
+    
+    # ========================================
+    # FEATURE ENGINEERING
+    # ========================================
+    
+    # 1. Créer les features numériques calculées
+    df['revenu_par_age'] = df['revenu_mensuel'] / (df['age'] + 1)
+    df['ratio_exp_entreprise'] = df['annee_experience_totale'] / (df['annees_dans_l_entreprise'] + 1)
+    
+    # 2. Créer les groupes d'âge (deleted)
+    
+    # 3. Créer le niveau de poste
+    df['poste_level'] = df['niveau_hierarchique_poste']
+    
+    # 4. Créer le niveau de fréquence de déplacement
+    if poste_freq_deplacement.lower() == 'rare':
+        df['freq_deplacement_level'] = 1
+    elif poste_freq_deplacement.lower() == 'modéré':
+        df['freq_deplacement_level'] = 2
+    else:  # Fréquent
+        df['freq_deplacement_level'] = 3
+    
+    # 5. Satisfaction moyenne
+    satisfactions = [satisfaction_environnement, satisfaction_travail, satisfaction_equipe, satisfaction_balance]
+    df['satisfaccion_media'] = np.mean(satisfactions)
+    
+    # 6. One-hot encoding pour les catégories
+    
+    # Departements
+    departements_possibles = ['Consulting', 'Ressources Humaines', 'IT', 'Finance', 'Marketing']
+    for dept in departements_possibles:
+        col_name = f'departement_{dept}'
+        df[col_name] = 1 if departement == dept else 0
+    
+    # Domaines d'étude
+    domaines_possibles = ['Entrepreunariat', 'Infra & Cloud', 'Marketing', 'Ressources Humaines', 'Transformation Digitale', 'Autres']
+    for domaine in domaines_possibles:
+        col_name = f'domaine_etude_{domaine}'
+        df[col_name] = 1 if domaine_etude == domaine else 0
+    
+    # 7. Ajouter la colonne % (pour compatibilité des noms)
+    df['% augementation_salaire_precedente'] = df['augementation_salaire_precedente']
+    
+    # 8. Ajouter niveau_education (par défaut)
+    df['niveau_education'] = 3
+    
+    # 9. Sélectionner UNIQUEMENT les colonnes attendues par le modèle
+    # En utilisant les features detectés du scaler si disponibles
+    if noms_features is not None:
+        # Utiliser les features du scaler
+        colonnes_attendues = noms_features
+    else:
+        # Utiliser les colonnes par défaut
+        colonnes_attendues = [
+            'genre', '% augementation_salaire_precedente', 'niveau_education', 'est_marie',
+            'departement_Consulting', 'departement_Ressources Humaines', 'departement_IT',
+            'departement_Finance', 'departement_Marketing',
+            'domaine_etude_Entrepreunariat', 'domaine_etude_Infra & Cloud', 
+            'domaine_etude_Marketing', 'domaine_etude_Ressources Humaines', 
+            'domaine_etude_Transformation Digitale', 'domaine_etude_Autres',
+            'poste_level', 'freq_deplacement_level', 
+            'ratio_exp_entreprise', 'revenu_par_age', 'satisfaccion_media'
+        ]
+    
+    # Créer DataFrame final avec les colonnes correctes
+    df_final = pd.DataFrame()
+    
+    for col in colonnes_attendues:
+        if col in df.columns:
+            df_final[col] = df[col]
+        else:
+            # Remplir avec 0 si manquante
+            df_final[col] = 0
+    
+    return df_final
 
 # ========================================
 # 🔮 FONCTION DE PRÉDICTION
 # ========================================
-def predict_churn(age, revenu, exp_prev, horas_trabajo, exp_total,
-                  años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
-                  sat_trabajo, sat_equipo, sat_balance, eval_actual, 
-                  horas_extra, aumento_sal, part_pee, formaciones, 
-                  empleados_bajo, distancia, nivel_edu, años_promocion, 
-                  años_responsable):
+def predire_churn(age, salaire, emplois_precedents, heures_semaine, experience_totale,
+                 annees_entreprise, annees_poste, satisfaction_environnement, evaluation_precedente, 
+                 niveau_hierarchique, satisfaction_travail, satisfaction_equipe, satisfaction_balance, 
+                 evaluation_actuelle, heures_supplementaires, augmentation_salaire, participation_pee, 
+                 formations_completees, employes_supervision, distance, annees_derniere_promotion, 
+                 annees_responsable_actuel, genre, etat_civil, departement, domaine_etude, poste_freq_deplacement):
+    
+    if modele is None or scaler is None:
+        return "❌ Erreur: Modèle ou Scaler non chargés correctement.\n\nVérifiez que les fichiers suivants existent dans le dossier 'models/':\n- lr_model_opt.pkl\n- scaler.pkl\n- seuil_opt.pkl"
     
     try:
-        # Créer DataFrame avec les valeurs d'entrée
-        input_data = pd.DataFrame([[
-            age, revenu, exp_prev, horas_trabajo, exp_total,
-            años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
-            sat_trabajo, sat_equipo, sat_balance, eval_actual, 
-            horas_extra, aumento_sal, part_pee, formaciones, 
-            empleados_bajo, distancia, nivel_edu, años_promocion, 
-            años_responsable
-        ]], columns=feature_names)
+        # Prétraiter les données
+        donnees_pretraitees = pretraiter_donnees(
+            age, salaire, emplois_precedents, heures_semaine, experience_totale,
+            annees_entreprise, annees_poste, satisfaction_environnement, evaluation_precedente, 
+            niveau_hierarchique, satisfaction_travail, satisfaction_equipe, satisfaction_balance, 
+            evaluation_actuelle, heures_supplementaires, augmentation_salaire, participation_pee, 
+            formations_completees, employes_supervision, distance, annees_derniere_promotion, 
+            annees_responsable_actuel, genre, etat_civil, departement, domaine_etude, poste_freq_deplacement
+        )
         
-        # Normaliser les caractéristiques
-        input_scaled = scaler.transform(input_data)
+        print(f"✅ Données prétraitées: {len(donnees_pretraitees.columns)} colonnes")
         
-        # Prédiction avec probabilité
-        proba = model.predict_proba(input_scaled)
-        prob_churn = proba  # Probabilité d'abandon (classe 1)
+        # Normaliser
+        donnees_normalisees = scaler.transform(donnees_pretraitees)
         
-        # Appliquer le seuil optimal
-        prediction = 1 if prob_churn >= meilleur_seuil else 0
+        # Prédiction
+        probabilites = modele.predict_proba(donnees_normalisees)[0]
+        prob_abandon = probabilites[1]
         
-        # Générer le résultat détaillé
+        # Appliquer le seuil
+        prediction = 1 if prob_abandon >= meilleur_seuil else 0
+        
+        # Résultats
+        pourcentage_abandon = prob_abandon * 100
+        pourcentage_seuil = meilleur_seuil * 100
+        
         if prediction == 1:
-            resultat = "⚠️ **RISQUE ÉLEVÉ D'ABANDON**"
-            couleur = "🔴"
-            recommandation = "Intervention immédiate recommandée (rétention, avantages, etc.)"
+            resultat = "🔴 **RISQUE ÉLEVÉ D'ABANDON**"
+            recommandation = "⚠️ Une intervention immédiate est recommandée (augmentation, promotion, avantages, etc.)"
         else:
-            resultat = "✅ **FAIBLE RISQUE**"
-            couleur = "🟢"
-            recommandation = "Employé avec probabilité faible d'abandon."
+            resultat = "🟢 **RISQUE FAIBLE**"
+            recommandation = "✅ Employé stable, maintenir la relation positive"
         
-        # Créer le message de sortie
-        output_text = f"""
-{couleur} {resultat}
+        sortie = f"""{resultat}
 
-**Probabilité de Churn :** {prob_churn*100:.1f}%
-**Seuil Appliqué :** {meilleur_seuil*100:.2f}%
-**Prédiction :** {'Quittera l\'entreprise' if prediction == 1 else 'Restera dans l\'entreprise'}
+**Probabilité d'Abandon:** {pourcentage_abandon:.1f}%
+**Seuil Appliqué:** {pourcentage_seuil:.2f}%
 
-**Recommandation :** {recommandation}
+{recommandation}
 
 ---
-**Confiance du Modèle :** {max(proba)*100:.1f}%
+**Confiance du Modèle:** {max(probabilites)*100:.1f}%
+**Détail:** Score de risque de {pourcentage_abandon:.1f}%
         """
-        
-        return output_text
+        return sortie
         
     except Exception as e:
-        return f"❌ Erreur dans la prédiction : {str(e)}"
+        message_erreur = str(e)
+        print(f"❌ Erreur en prédiction: {message_erreur}")
+        return f"❌ Erreur: {message_erreur}\n\n💡 Vérifiez que tous les champs sont correctement remplis."
 
 # ========================================
 # 🎨 INTERFACE GRADIO
 # ========================================
-def creer_interface():
-    with gr.Blocks(title="Prédicteur de Churn - RH", theme=gr.themes.Soft()) as demo:
-        
-        # En-tête
-        gr.Markdown("""
+with gr.Blocks(title="Prédicteur de Churn", theme=gr.themes.Soft()) as demo:
+    
+    gr.Markdown("""
 # 👥 Prédicteur de Churn des Employés
-## Prédis si un employé risque de quitter l'entreprise
-        
----
-**Remplis les champs de l'employé et clique sur "Prédire" pour obtenir l'analyse de risque.**
-        """)
-        
-        # SECTION 1 : INFORMATIONS PERSONNELLES ET PROFESSIONNELLES
-        with gr.Group():
-            gr.Markdown("### 📝 Informations Personnelles et Professionnelles")
-            with gr.Row():
-                with gr.Column():
-                    age = gr.Slider(
-                        label="Âge",
-                        minimum=18, maximum=65, value=35, step=1,
-                        info="Âge de l'employé"
-                    )
-                    revenu = gr.Number(
-                        label="Revenu Mensuel (€)",
-                        value=5000,
-                        info="Salaire mensuel brut"
-                    )
-                    niveau_edu = gr.Slider(
-                        label="Niveau d'Éducation",
-                        minimum=1, maximum=5, value=3, step=1,
-                        info="1=Maximum, 5=Minimum"
-                    )
-                
-                with gr.Column():
-                    distancia = gr.Slider(
-                        label="Distance Domicile-Travail (km)",
-                        minimum=0, maximum=50, value=5, step=1,
-                        info="Distance de trajet"
-                    )
-                    horas_trabajo = gr.Number(
-                        label="Heures de Travail/Semaine",
-                        value=80,
-                        info="Heures travaillées par semaine"
-                    )
-        
-        # SECTION 2 : EXPÉRIENCE
-        with gr.Group():
-            gr.Markdown("### 💼 Expérience et Trajectoire")
-            with gr.Row():
-                with gr.Column():
-                    exp_prev = gr.Slider(
-                        label="Expériences Précédentes",
-                        minimum=0, maximum=20, value=3, step=1,
-                        info="Nombre d'emplois antérieurs"
-                    )
-                    exp_total = gr.Slider(
-                        label="Années d'Expérience Totale",
-                        minimum=0, maximum=50, value=8, step=1,
-                        info="Expérience professionnelle accumulée"
-                    )
-                
-                with gr.Column():
-                    años_empresa = gr.Slider(
-                        label="Années dans l'Entreprise",
-                        minimum=0, maximum=40, value=5, step=1,
-                        info="Ancienneté dans l'entreprise"
-                    )
-                    años_puesto = gr.Slider(
-                        label="Années au Poste Actuel",
-                        minimum=0, maximum=30, value=3, step=1,
-                        info="Temps au poste actuel"
-                    )
-        
-        # SECTION 3 : ÉVALUATION ET PERFORMANCE
-        with gr.Group():
-            gr.Markdown("### 📊 Évaluation et Performance")
-            with gr.Row():
-                with gr.Column():
-                    eval_prev = gr.Slider(
-                        label="Évaluation Précédente",
-                        minimum=1, maximum=4, value=3, step=1,
-                        info="Note de l'évaluation précédente"
-                    )
-                    eval_actual = gr.Slider(
-                        label="Évaluation Actuelle",
-                        minimum=1, maximum=4, value=3, step=1,
-                        info="Note de l'évaluation actuelle"
-                    )
-                
-                with gr.Column():
-                    nivel_jer = gr.Slider(
-                        label="Niveau Hiérarchique",
-                        minimum=1, maximum=5, value=2, step=1,
-                        info="1=Bas, 5=Haut"
-                    )
-                    empleados_bajo = gr.Slider(
-                        label="Employés sous Responsabilité",
-                        minimum=0, maximum=50, value=0, step=1,
-                        info="Nombre de personnes supervisées"
-                    )
-        
-        # SECTION 4 : SATISFACTION
-        with gr.Group():
-            gr.Markdown("### 😊 Niveaux de Satisfaction (1-4)")
-            with gr.Row():
-                with gr.Column():
-                    sat_env = gr.Slider(
-                        label="Satisfaction Environnement",
-                        minimum=1, maximum=4, value=3, step=1,
-                        info="Satisfaction avec l'environnement de travail"
-                    )
-                    sat_trabajo = gr.Slider(
-                        label="Satisfaction Nature du Travail",
-                        minimum=1, maximum=4, value=3, step=1,
-                        info="Aime-t-il ce qu'il fait ?"
-                    )
-                
-                with gr.Column():
-                    sat_equipo = gr.Slider(
-                        label="Satisfaction Équipe",
-                        minimum=1, maximum=4, value=3, step=1,
-                        info="Satisfaction avec les collègues"
-                    )
-                    sat_balance = gr.Slider(
-                        label="Satisfaction Équilibre Vie-Travail",
-                        minimum=1, maximum=4, value=3, step=1,
-                        info="Équilibre vie personnelle-professionnelle ?"
-                    )
-        
-        # SECTION 5 : COMPENSATION ET AVANTAGES
-        with gr.Group():
-            gr.Markdown("### 💰 Compensation et Avantages")
-            with gr.Row():
-                with gr.Column():
-                    aumento_sal = gr.Number(
-                        label="Dernier Augmentation Salaire (%)",
-                        value=15,
-                        info="Pourcentage de la dernière augmentation"
-                    )
-                    horas_extra = gr.Checkbox(
-                        label="Travaille Heures Supplémentaires ?",
-                        value=False,
-                        info="Réalise-t-il des heures extraordinaires ?"
-                    )
-                
-                with gr.Column():
-                    part_pee = gr.Slider(
-                        label="Participation Plan Actions",
-                        minimum=0, maximum=5, value=1, step=1,
-                        info="Participation en PEE/plans"
-                    )
-                    formaciones = gr.Slider(
-                        label="Formations Complétées",
-                        minimum=0, maximum=10, value=2, step=1,
-                        info="Nombre de cours réalisés"
-                    )
-        
-        # SECTION 6 : PROGRESSION
-        with gr.Group():
-            gr.Markdown("### 🚀 Progression et Carrière")
-            with gr.Row():
-                with gr.Column():
-                    años_promocion = gr.Slider(
-                        label="Années depuis Dernière Promotion",
-                        minimum=0, maximum=20, value=1, step=1,
-                        info="Quand a eu lieu la dernière promotion ?"
-                    )
-                    años_responsable = gr.Slider(
-                        label="Années sous Responsable Actuel",
-                        minimum=0, maximum=20, value=3, step=1,
-                        info="Temps avec manager/responsable actuel"
-                    )
-        
-        # BOUTONS D'ACTION
-        gr.Markdown("---")
+## Prédis si un employé risque d'abandonner l'entreprise
+
+**Remplis les champs ci-dessous et clique sur "PRÉDIRE"**
+    """)
+    
+    # Section 1: Information Personnelle
+    with gr.Group():
+        gr.Markdown("### 📝 Information Personnelle")
         with gr.Row():
-            predict_btn = gr.Button("🔮 Prédire le Risque de Churn", variant="primary", size="lg")
-            reset_btn = gr.Button("🔄 Réinitialiser", size="lg")
-        
-        # OUTPUT
-        output = gr.Markdown(label="Résultat")
-        
-        # FONCTIONS DES BOUTONS
-        predict_btn.click(
-            predict_churn,
-            inputs=[age, revenu, exp_prev, horas_trabajo, exp_total,
-                    años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
-                    sat_trabajo, sat_equipo, sat_balance, eval_actual, 
-                    horas_extra, aumento_sal, part_pee, formaciones, 
-                    empleados_bajo, distancia, nivel_edu, años_promocion, 
-                    años_responsable],
-            outputs=output
-        )
-        
-        reset_btn.click(
-            lambda: (35, 5000, 3, 80, 8, 5, 3, 3, 3, 2, 3, 3, 3, 3, False, 15, 1, 2, 0, 5, 3, 1, 3, ""),
-            outputs=[age, revenu, exp_prev, horas_trabajo, exp_total,
-                    años_empresa, años_puesto, sat_env, eval_prev, nivel_jer,
-                    sat_trabajo, sat_equipo, sat_balance, eval_actual, 
-                    horas_extra, aumento_sal, part_pee, formaciones, 
-                    empleados_bajo, distancia, nivel_edu, años_promocion, 
-                    años_responsable, output]
-        )
-        
-        # Pied de page
-        gr.Markdown(f"""
----
-**ℹ️ Informations :**
-- Modèle : Logistic Regression Optimisé
-- Données d'entraînement : 1 470 employés
-- Seuil optimal : {meilleur_seuil*100:.2f}%
-- Précision du modèle : ~95%
+            age = gr.Number(value=35, label="Âge", info="Âge de l'employé")
+            genre = gr.Radio(["Masculin", "Féminin"], value="Masculin", label="Genre")
+            etat_civil = gr.Radio(["Célibataire", "Marié(e)", "Divorcé(e)"], value="Marié(e)", label="État Civil")
+        with gr.Row():
+            salaire = gr.Number(value=5000, label="Salaire Mensuel (€)", info="Salaire brut mensuel")
+            distance = gr.Number(value=5, label="Distance Domicile (km)", info="Km de trajet")
+    
+    # Section 2: Entreprise et Poste
+    with gr.Group():
+        gr.Markdown("### 🏢 Informations Entreprise et Poste")
+        with gr.Row():
+            departement = gr.Dropdown(
+                ["Consulting", "Ressources Humaines", "IT", "Finance", "Marketing"],
+                value="Consulting", label="Département"
+            )
+            domaine_etude = gr.Dropdown(
+                ["Entrepreunariat", "Infra & Cloud", "Marketing", "Ressources Humaines", "Transformation Digitale", "Autres"],
+                value="Transformation Digitale", label="Domaine d'Étude"
+            )
+        with gr.Row():
+            poste_freq_deplacement = gr.Radio(["Rare", "Modéré", "Fréquent"], value="Modéré", label="Fréquence de Déplacement")
+            niveau_hierarchique = gr.Slider(1, 5, 2, label="Niveau Hiérarchique (1-5)")
+    
+    # Section 3: Expérience
+    with gr.Group():
+        gr.Markdown("### 💼 Expérience Professionnelle")
+        with gr.Row():
+            emplois_precedents = gr.Number(value=3, label="Emplois Antérieurs")
+            experience_totale = gr.Number(value=8, label="Années d'Expérience Totale")
+        with gr.Row():
+            annees_entreprise = gr.Number(value=5, label="Années dans l'Entreprise")
+            annees_poste = gr.Number(value=2, label="Années au Poste Actuel")
+        with gr.Row():
+            annees_derniere_promotion = gr.Number(value=1, label="Années depuis Dernière Promotion")
+            annees_responsable_actuel = gr.Number(value=3, label="Années sous Responsable Actuel")
+    
+    # Section 4: Travail
+    with gr.Group():
+        gr.Markdown("### 📊 Évaluation et Travail")
+        with gr.Row():
+            heures_semaine = gr.Number(value=40, label="Heures/Semaine")
+            evaluation_precedente = gr.Slider(1, 4, 3, label="Évaluation Précédente (1-4)")
+            evaluation_actuelle = gr.Slider(1, 4, 3, label="Évaluation Actuelle (1-4)")
+        with gr.Row():
+            employes_supervision = gr.Number(value=0, label="Employés Supervisés")
+            heures_supplementaires = gr.Checkbox(value=False, label="Travaille Heures Supplémentaires?")
+    
+    # Section 5: Satisfaction
+    with gr.Group():
+        gr.Markdown("### 😊 Niveaux de Satisfaction (1-4)")
+        with gr.Row():
+            satisfaction_environnement = gr.Slider(1, 4, 3, label="Environnement")
+            satisfaction_travail = gr.Slider(1, 4, 3, label="Type de Travail")
+            satisfaction_equipe = gr.Slider(1, 4, 3, label="Équipe")
+            satisfaction_balance = gr.Slider(1, 4, 3, label="Équilibre Vie-Travail")
+    
+    # Section 6: Compensation
+    with gr.Group():
+        gr.Markdown("### 💰 Compensation")
+        with gr.Row():
+            augmentation_salaire = gr.Number(value=15, label="Dernière Augmentation (%)")
+            participation_pee = gr.Number(value=1, label="Participation Plan Actions")
+            formations_completees = gr.Number(value=2, label="Formations Complétées")
+    
+    # Boutons
+    gr.Markdown("---")
+    with gr.Row():
+        bouton_predire = gr.Button("🔮 PRÉDIRE", variant="primary", size="lg")
+        bouton_reinitialiser = gr.Button("🔄 Réinitialiser", size="lg")
+    
+    # Sortie
+    sortie = gr.Markdown("Le résultat apparaîtra ici...")
+    
+    # Actions des boutons
+    bouton_predire.click(
+        fn=predire_churn,
+        inputs=[age, salaire, emplois_precedents, heures_semaine, experience_totale,
+                annees_entreprise, annees_poste, satisfaction_environnement, evaluation_precedente, 
+                niveau_hierarchique, satisfaction_travail, satisfaction_equipe, satisfaction_balance, 
+                evaluation_actuelle, heures_supplementaires, augmentation_salaire, participation_pee, 
+                formations_completees, employes_supervision, distance, annees_derniere_promotion, 
+                annees_responsable_actuel, genre, etat_civil, departement, domaine_etude, poste_freq_deplacement],
+        outputs=sortie
+    )
+    
+    bouton_reinitialiser.click(
+        fn=lambda: (35, 5000, 3, 40, 8, 5, 2, 3, 3, 2, 3, 3, 3, 3, False, 15, 1, 2, 0, 5, 1, 3, 
+                    "Masculin", "Marié(e)", "Consulting", "Transformation Digitale", "Modéré", "Le résultat apparaîtra ici..."),
+        outputs=[age, salaire, emplois_precedents, heures_semaine, experience_totale,
+                annees_entreprise, annees_poste, satisfaction_environnement, evaluation_precedente, 
+                niveau_hierarchique, satisfaction_travail, satisfaction_equipe, satisfaction_balance, 
+                evaluation_actuelle, heures_supplementaires, augmentation_salaire, participation_pee, 
+                formations_completees, employes_supervision, distance, annees_derniere_promotion, 
+                annees_responsable_actuel, genre, etat_civil, departement, domaine_etude, poste_freq_deplacement, sortie]
+    )
+    
+    gr.Markdown("---\n**Modèle ML optimisé pour prédiction de churn** 🚀")
 
-**Développé avec Scikit-learn, Gradio et Hugging Face Spaces**
-        """)
-        
-    return demo
-
-# ========================================
-# 🚀 EXÉCUTER L'APPLICATION
-# ========================================
 if __name__ == "__main__":
-    demo = creer_interface()
     demo.launch(share=False)
