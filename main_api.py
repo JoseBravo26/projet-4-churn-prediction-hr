@@ -236,18 +236,7 @@ def pretraiter_donnees(employee: EmployeeInput) -> pd.DataFrame:
     df['revenu_par_age'] = df['revenu_mensuel'] / (df['age'] + 1)
     df['ratio_exp_entreprise'] = df['annee_experience_totale'] / (df['annees_dans_l_entreprise'] + 1)
     
-    # Age groups
-    def creer_age_group(age):
-        if age < 30:
-            return 'Jeune'
-        elif age < 40:
-            return 'Adulte'
-        elif age < 50:
-            return 'Senior'
-        else:
-            return 'Très Senior'
-    
-    df['age_group'] = df['age'].apply(creer_age_group)
+    # Age groups (deleted)
     df['poste_level'] = df['niveau_hierarchique_poste']
     
     # Fréquence de déplacement
@@ -286,7 +275,7 @@ def pretraiter_donnees(employee: EmployeeInput) -> pd.DataFrame:
             'domaine_etude_Marketing', 'domaine_etude_Ressources Humaines', 
             'domaine_etude_Transformation Digitale', 'domaine_etude_Autres',
             'poste_level', 'freq_deplacement_level', 
-            'ratio_exp_entreprise', 'revenu_par_age', 'age_group', 'satisfaccion_media'
+            'ratio_exp_entreprise', 'revenu_par_age', 'satisfaccion_media'
         ]
     
     df_final = pd.DataFrame()
@@ -346,7 +335,7 @@ def faire_prediction(employee: EmployeeInput) -> PredictionResponse:
             details={
                 "prob_rester": round(probabilites[0] * 100, 2),
                 "prob_partir": round(probabilites[1] * 100, 2),
-                "age_groupe": "Jeune" if employee.age < 30 else "Adulte" if employee.age < 40 else "Senior" if employee.age < 50 else "Très Senior",
+               
                 "satisfaction_moyenne": round(np.mean([employee.satisfaction_environnement, employee.satisfaction_travail, 
                                                        employee.satisfaction_equipe, employee.satisfaction_balance]), 2),
                 "salaire": employee.salaire,
