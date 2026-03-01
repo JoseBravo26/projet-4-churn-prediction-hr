@@ -3,6 +3,8 @@ API FastAPI pour prédiction de Churn
 Expose le modèle ML avec validation Pydantic robuste
 """
 
+from unittest import result
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
@@ -13,7 +15,31 @@ import numpy as np
 from enum import Enum
 import uvicorn
 import warnings
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
 warnings.filterwarnings('ignore')
+
+# ========================================
+# 🔌 CONNEXION À LA BASE POSTGRES
+# ========================================
+
+def get_db_connection():
+    """
+    Retourne une connexion PostgreSQL vers churn_predictor_db.
+    À ADAPTER si ton mot de passe change.
+    """
+    conn = psycopg2.connect(
+        dbname="churn_predictor_db",
+        user="churn_app",
+        password="secure_password_123",
+        host="localhost",
+        port=5432,
+    )
+    # Forcer une encodage compatible avec Windows / PostgreSQL
+    conn.set_client_encoding("LATIN1")
+    return conn
+
 
 # ========================================
 # 📦 CHARGER MODÈLE, SCALER ET SEUIL
@@ -47,12 +73,12 @@ except Exception as e:
 
 class GenreEnum(str, Enum):
     masculin = "Masculin"
-    feminin = "Féminin"
+    feminin = "Feminin"
 
 class EtatCivilEnum(str, Enum):
-    celibataire = "Célibataire"
-    marie = "Marié(e)"
-    divorce = "Divorcé(e)"
+    celibataire = "Celibataire"
+    marie = "Marie(e)"
+    divorce = "Divorce(e)"
 
 class DepartementEnum(str, Enum):
     consulting = "Consulting"
@@ -71,7 +97,7 @@ class DomaineEtudeEnum(str, Enum):
 
 class FrequenceDeplacementEnum(str, Enum):
     rare = "Rare"
-    modere = "Modéré"
+    modere = "Modere"
     frequent = "Fréquent"
 
 # ========================================
@@ -293,41 +319,41 @@ def pretraiter_donnees(employee: EmployeeInput) -> pd.DataFrame:
 
 def faire_prediction(employee: EmployeeInput) -> PredictionResponse:
     """
-    Réalise une prédiction pour un employé
+    Réalise une prédiction pour un employé ET enregistre le résultat en base.
     """
     if modele is None or scaler is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Modèle non chargé correctement. Vérifiez les fichiers dans models/"
+            detail="Modèle non chargé correctement. Vérifiez les fichiers dans 'models'."
         )
-    
+
     try:
-        # Prétraiter les données
+        # 1️⃣ Prétraiter + prédire (como antes)
         donnees_pretraitees = pretraiter_donnees(employee)
-        
-        # Normaliser
         donnees_normalisees = scaler.transform(donnees_pretraitees)
-        
-        # Prédire
         probabilites = modele.predict_proba(donnees_normalisees)[0]
         prob_abandon = probabilites[1]
-        
+
         # Appliquer le seuil
-        prediction = 1 if prob_abandon >= meilleur_seuil else 0
-        
-        # Résultats
+        prediction_flag = 1 if prob_abandon >= meilleur_seuil else 0
+
         pourcentage_abandon = prob_abandon * 100
         pourcentage_seuil = meilleur_seuil * 100
-        
-        if prediction == 1:
-            prediction_text = "Risque Élevé"
-            recommandation = "Intervention immédiate recommandée: augmentation, promotion, avantages, télétravail"
+
+        if prediction_flag == 1:
+            prediction_texte = "Risque Élevé"
+            db_prediction = "RISQUE_ELEVE"      # para la base (ASCII)
+            recommandation = (
+                "Intervention immédiate recommandée (augmentation, promotion, avantages, télétravail, etc.)."
+            )
         else:
-            prediction_text = "Risque Faible"
-            recommandation = "Maintenir la relation positive, surveiller l'évolution"
-        
-        return PredictionResponse(
-            prediction=prediction_text,
+            prediction_texte = "Risque Faible"
+            db_prediction = "RISQUE_FAIBLE"     # para la base (ASCII)
+            recommandation = "Employé plutôt stable. Maintenir la relation positive et surveiller l’évolution."
+
+        # 2️⃣ Construire l'objet de réponse (toujours, même si la base échoue)
+        reponse = PredictionResponse(
+            prediction=prediction_texte,
             probabilite_abandon=round(pourcentage_abandon, 2),
             seuil_applique=round(pourcentage_seuil, 2),
             confiance_modele=round(max(probabilites) * 100, 2),
@@ -336,18 +362,107 @@ def faire_prediction(employee: EmployeeInput) -> PredictionResponse:
                 "prob_rester": round(probabilites[0] * 100, 2),
                 "prob_partir": round(probabilites[1] * 100, 2),
                
-                "satisfaction_moyenne": round(np.mean([employee.satisfaction_environnement, employee.satisfaction_travail, 
-                                                       employee.satisfaction_equipe, employee.satisfaction_balance]), 2),
+                "satisfaction_moyenne": round(
+                    np.mean([
+                        employee.satisfaction_environnement,
+                        employee.satisfaction_travail,
+                        employee.satisfaction_equipe,
+                        employee.satisfaction_balance,
+                    ]), 2,
+                ),
                 "salaire": employee.salaire,
                 "departement": employee.departement.value,
-                "anciennete_ans": employee.annees_entreprise
-            }
+                "anciennete_ans": employee.annees_entreprise,
+            },
         )
-        
+
+        # 3️⃣ Enregistrer en base de données
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            # 3a. Employees con ON CONFLICT
+            genre_code = "F" if employee.genre.value.startswith("F") else "M"
+            satisfaction_moy = float(
+                np.mean([
+                    employee.satisfaction_environnement,
+                    employee.satisfaction_travail,
+                    employee.satisfaction_equipe,
+                    employee.satisfaction_balance,
+                ]) / 4.0
+            )
+
+            cur.execute(
+                """
+                INSERT INTO employees (age, genre, salaire, anciennete, satisfaction, turnover)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+                RETURNING id;
+                """,
+                (
+                    employee.age,
+                    employee.genre.value,
+                    float(employee.salaire),
+                    float(employee.annees_entreprise),
+                    satisfaction_moy,
+                    bool(prediction_flag),
+                ),
+            )
+            result = cur.fetchone()
+            if result:
+                emp_id = result[0]
+            else:
+                cur.execute("SELECT id FROM employees ORDER BY id DESC LIMIT 1;")
+                emp_id = cur.fetchone()[0]
+
+            # 3b. Predictions
+            cur.execute(
+                """
+                INSERT INTO predictions (emp_id, prediction, probability)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+                RETURNING id;
+                """,
+                (emp_id, db_prediction, float(prob_abandon)),
+            )
+            result = cur.fetchone()
+            if result:
+                prediction_id = result[0]
+            else:
+                cur.execute("SELECT id FROM predictions ORDER BY id DESC LIMIT 1;")
+                prediction_id = cur.fetchone()[0]
+
+            # 3c. Audit log
+            cur.execute(
+                """
+                INSERT INTO audit_log (prediction_id, action, status)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (id) DO NOTHING;
+                """,
+                (prediction_id, "PREDICT", "SUCCESS"),
+            )
+
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"✅ Données enregistrées: emp_id={emp_id}, pred_id={prediction_id}")
+
+        except Exception as db_err:
+            print(f"⚠️ Erreur enregistrement DB: {repr(db_err)}")
+            try:
+                conn.rollback()
+            except:
+                pass
+
+        # 4️⃣ Retourner la réponse
+        return reponse
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Erreur lors de la prédiction: {str(e)}"
+            detail=f"Erreur lors de la prédiction: {str(e)}",
         )
 
 # ========================================
