@@ -1,0 +1,326 @@
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                 🏗️  ARQUITECTURA COMPLETA - ÉTAPE 4                           ║
+║              PostgreSQL + SQLAlchemy + FastAPI + Traçabilité                  ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+═════════════════════════════════════════════════════════════════════════════════
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                        CAPA 1: APLICACIÓN (FastAPI)                         ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│                                                                             │
+│                              CLIENT (HTTP)                                 │
+│                                    │                                       │
+│                                    ▼                                       │
+│                         ┌──────────────────┐                               │
+│                         │   POST /predict  │                               │
+│                         │   {"age": 35...} │                               │
+│                         └────────┬─────────┘                               │
+│                                  │                                         │
+│         ┌────────────────────────▼─────────────────────────────┐           │
+│         │              FASTAPI ENDPOINT                        │           │
+│         │         (main_api_with_db.py)                       │           │
+│         ├─────────────────────────────────────────────────────┤           │
+│         │                                                     │           │
+│         │  1. Recibir request                                │           │
+│         │  2. ✓ Pydantic valida (EmployeeInput)              │           │
+│         │  3. 📊 Preparar features                           │           │
+│         │  4. 🤖 Modelo predice                              │           │
+│         │  5. 💾 GUARDAR en DB (Prediction)                  │           │
+│         │  6. 📝 CREAR log auditoría                         │           │
+│         │  7. ✅ Retornar respuesta JSON                      │           │
+│         │                                                     │           │
+│         └─────────────────────┬──────────────────────────────┘           │
+│                               │                                           │
+│         ┌─────────────────────┴──────────────────────────────┐           │
+│         │  SQLAlchemy ORM                                   │           │
+│         │  (Interfaz entre App ↔ DB)                        │           │
+│         └─────────────────────┬──────────────────────────────┘           │
+│                               │                                           │
+└───────────────────────────────┼───────────────────────────────────────────┘
+                                │
+                                ▼
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃              CAPA 2: BASE DE DATOS (PostgreSQL)                             ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│                                                                             │
+│  DATABASE: churn_predictor_db (Port: 5432)                                │
+│  Usuario: churn_app (permisos limitados)                                  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐ │
+│  │                     TABLA 1: EMPLOYEES                               │ │
+│  │  ┌────┬─────┬────────┬────────┬──────┬────────┬──────┐              │ │
+│  │  │ id │ age │ genre  │ salary │ ... │ turnover│ date │              │ │
+│  │  ├────┼─────┼────────┼────────┼──────┼────────┼──────┤              │ │
+│  │  │ 1  │ 32  │Masculin│ 4500  │...   │ False  │ 2024 │              │ │
+│  │  │ 2  │ 45  │Feminin │ 6000  │...   │ True   │ 2024 │              │ │
+│  │  │... │ ... │  ...   │  ...  │ ...  │  ...   │ ...  │              │ │
+│  │  │14.999│ 28 │Masculin│ 5500  │...   │ False  │ 2024 │              │ │
+│  │  └────┴─────┴────────┴────────┴──────┴────────┴──────┘              │ │
+│  │                                                                      │ │
+│  │  💾 PROPÓSITO: Guardar todos los empleados del dataset              │ │
+│  │  📊 REGISTROS: 14.999 (todo tu dataset completo)                    │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐ │
+│  │                     TABLA 2: PREDICTIONS                             │ │
+│  │  ┌────┬───────────┬──────┬──────┬──────┬──────┬────────┐             │ │
+│  │  │id  │emp_id (FK)│pred  │prob  │conf  │model │created │             │ │
+│  │  ├────┼───────────┼──────┼──────┼──────┼──────┼────────┤             │ │
+│  │  │ 1  │   NULL    │Churn │ 0.87 │ Alta │ 1.0.0│18:30:45│             │ │
+│  │  │ 2  │   NULL    │NoChurn│ 0.32│ Baja │ 1.0.0│18:25:30│             │ │
+│  │  │ 3  │   NULL    │Churn │ 0.91 │ Alta │ 1.0.0│18:20:15│             │ │
+│  │  │... │   ...     │ ...  │ ...  │ ...  │ ...  │  ...   │             │ │
+│  │  └────┴───────────┴──────┴──────┴──────┴──────┴────────┘             │ │
+│  │                                                                      │ │
+│  │  💾 PROPÓSITO: Guardar TODOS los outputs del modelo                 │ │
+│  │  📈 REGISTROS: Crece con cada predicción (trazabilidad)              │ │
+│  │  🔍 BUSQUEDA: Por timestamp, probabilidad, predicción                │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐ │
+│  │                     TABLA 3: AUDIT_LOG                               │ │
+│  │  ┌────┬────────────┬──────────┬──────┬──────────┬────────┐           │ │
+│  │  │id  │pred_id(FK) │ action   │status│  error   │ created│           │ │
+│  │  ├────┼────────────┼──────────┼──────┼──────────┼────────┤           │ │
+│  │  │156 │     1      │ PREDICT  │ OK   │  NULL    │18:30:45│           │ │
+│  │  │157 │     2      │ PREDICT  │ OK   │  NULL    │18:25:30│           │ │
+│  │  │158 │    NULL    │ PREDICT  │ERROR │ type_err │18:20:15│           │ │
+│  │  │... │    ...     │  ...     │ ...  │   ...    │  ...   │           │ │
+│  │  └────┴────────────┴──────────┴──────┴──────────┴────────┘           │ │
+│  │                                                                      │ │
+│  │  🔒 PROPÓSITO: Auditoría completa y seguridad                        │ │
+│  │  ✅ REGISTROS: 1 por predicción (o más si errors)                    │ │
+│  │  🚨 ALERTAS: Detectar errores automáticamente                        │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  🔑 RELACIONES:                                                           │
+│     employees (1) ──────► (N) predictions                                │
+│     predictions (1) ─────► (N) audit_log                                 │
+│                                                                             │
+│  📑 ÍNDICES (para performance):                                           │
+│     - idx_predictions_employee_id                                        │
+│     - idx_predictions_created_at  ← Búsquedas rápidas por fecha         │
+│     - idx_audit_log_status  ← Buscar errores rápidamente                │
+│                                                                             │
+│  🔐 SEGURIDAD:                                                            │
+│     - Usuario: churn_app                                                 │
+│     - Permisos: SELECT, INSERT (NO DELETE, NO DROP)                      │
+│     - Contraseña: almacenada en .env (NO en código)                      │
+│                                                                             │
+└───────────────────────────────────────────────────────────────────────────┘
+
+═════════════════════════════════════════════════════════════════════════════════
+
+🔄 FLUJO DETALLADO: UNA PREDICCIÓN COMPLETA
+
+   CLIENTE                       API                           BD
+      │                          │                            │
+      ├─────  REQUEST ──────────►│                            │
+      │   POST /predict          │                            │
+      │   {"age": 35, ...}       │                            │
+      │                          │                            │
+      │                    ┌─────▼────────┐                   │
+      │                    │ 1. Validar   │                   │
+      │                    │ (Pydantic)   │                   │
+      │                    │ ✓ age OK     │                   │
+      │                    │ ✓ genre OK   │                   │
+      │                    └─────┬────────┘                   │
+      │                          │                            │
+      │                    ┌─────▼────────┐                   │
+      │                    │ 2. Features  │                   │
+      │                    │ [35, 1, ...]│                   │
+      │                    └─────┬────────┘                   │
+      │                          │                            │
+      │                    ┌─────▼────────┐                   │
+      │                    │ 3. Modelo    │                   │
+      │                    │ prob: 0.87   │                   │
+      │                    └─────┬────────┘                   │
+      │                          │                            │
+      │                    ┌─────▼──────────────────┐         │
+      │                    │ 4. INSERT predictions  │         │
+      │                    │    (id, prediction,    │────────►│
+      │                    │     probability, ...)  │         │
+      │                    └─────┬──────────────────┘         │
+      │                          │                    ┌───────▼────┐
+      │                          │                    │ INSERT OK  │
+      │                          │                    │ ID: 42 ◄────
+      │                          │◄───────────────────┘           │
+      │                    ┌─────▼──────────────────┐         │
+      │                    │ 5. INSERT audit_log    │         │
+      │                    │    (pred_id=42,        │────────►│
+      │                    │     action="PREDICT",  │         │
+      │                    │     status="SUCCESS")  │         │
+      │                    └─────┬──────────────────┘         │
+      │                          │                    ┌───────▼────┐
+      │                          │                    │ INSERT OK  │
+      │                          │                    │ ID: 156 ◄───
+      │                          │◄───────────────────┘           │
+      │                    ┌─────▼────────┐                   │
+      │                    │ 6. Response  │                   │
+      │◄──── RESPONSE ─────┤ {pred:Churn, │                   │
+      │   {                 │  prob: 0.87, │                   │
+      │    prediction:      │  pred_id:42} │                   │
+      │    "Churn",         └──────────────┘                   │
+      │    probability:                                       │
+      │    0.87,                                              │
+      │    pred_id: 42                                        │
+      │   }                                                   │
+      │                                                       │
+      ▼
+
+═════════════════════════════════════════════════════════════════════════════════
+
+📊 DESPUÉS: CONSULTAS DE TRAZABILIDAD
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CONSULTA 1: Ver últimas predicciones                                        │
+│                                                                             │
+│ GET /predictions/history?limit=5                                           │
+│                                                                             │
+│ SQL: SELECT * FROM predictions ORDER BY created_at DESC LIMIT 5            │
+│                                                                             │
+│ RESULTADO:                                                                  │
+│ ┌────┬────────┬───────────┬──────────┬─────────────┐                       │
+│ │ id │pred    │probability│confidence│ created_at  │                       │
+│ ├────┼────────┼───────────┼──────────┼─────────────┤                       │
+│ │ 42 │ Churn  │   0.87    │ Alta     │ 18:30:45    │ ◄── Última           │
+│ │ 41 │ NoChurn│   0.32    │ Baja     │ 18:25:30    │                       │
+│ │ 40 │ Churn  │   0.91    │ Alta     │ 18:20:15    │                       │
+│ │ 39 │ NoChurn│   0.45    │ Media    │ 18:15:00    │                       │
+│ │ 38 │ Churn  │   0.76    │ Alta     │ 18:10:45    │                       │
+│ └────┴────────┴───────────┴──────────┴─────────────┘                       │
+│                                                                             │
+│ ✅ Ves el histórico completo                                               │
+│ ✅ Timestamps exactos                                                      │
+│ ✅ Fácil auditoría                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CONSULTA 2: Ver auditoría de una predicción específica                      │
+│                                                                             │
+│ GET /audit/logs?prediction_id=42                                           │
+│ SQL: SELECT * FROM audit_log WHERE prediction_id = 42                      │
+│                                                                             │
+│ RESULTADO:                                                                  │
+│ ┌─────┬───────────┬──────────┬───────┬──────────────┐                      │
+│ │ id  │ action    │ status   │ error │ created_at   │                      │
+│ ├─────┼───────────┼──────────┼───────┼──────────────┤                      │
+│ │ 156 │ PREDICT   │ SUCCESS  │ NULL  │ 18:30:45     │ ◄── TODO OK          │
+│ └─────┴───────────┴──────────┴───────┴──────────────┘                      │
+│                                                                             │
+│ ✅ Se puede rastrear EXACTAMENTE qué pasó                                  │
+│ ✅ Si hubiera error → error_message estaría lleno                          │
+│ ✅ Perfecto para debugging                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CONSULTA 3: Ver solo errores                                               │
+│                                                                             │
+│ GET /audit/logs?status=ERROR                                               │
+│ SQL: SELECT * FROM audit_log WHERE status = 'ERROR'                        │
+│                                                                             │
+│ RESULTADO:                                                                  │
+│ ┌─────┬───────────┬──────────┬─────────────────┬──────────────┐            │
+│ │ id  │ action    │ status   │ error_message   │ created_at   │            │
+│ ├─────┼───────────┼──────────┼─────────────────┼──────────────┤            │
+│ │ 158 │ PREDICT   │ ERROR    │ type_error      │ 18:20:15     │            │
+│ │ 160 │ PREDICT   │ ERROR    │ value_error     │ 18:15:30     │            │
+│ └─────┴───────────┴──────────┴─────────────────┴──────────────┘            │
+│                                                                             │
+│ ✅ Detectar problemas rápidamente                                          │
+│ ✅ Alertar cuando algo falla                                               │
+│ ✅ Entender qué cliente está haciendo requests malos                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═════════════════════════════════════════════════════════════════════════════════
+
+🎯 VENTAJAS DE ESTA ARQUITECTURA
+
+✅ TRAZABILIDAD COMPLETA
+   • Cada predicción registrada con timestamp
+   • Input data guardado como JSONB (searchable)
+   • Audit trail completo
+   • Detección automática de errores
+
+✅ ESCALABILIDAD
+   • Índices optimizados
+   • Connection pooling
+   • Vistas SQL para análisis
+   • Manejo de 1000s de predicciones/min
+
+✅ SEGURIDAD
+   • Usuario DB con permisos limitados
+   • Contraseña fuerte en .env
+   • Validación en 2 niveles (Pydantic + DB)
+   • Constraints a nivel base de datos
+
+✅ MANTENIBILIDAD
+   • Código limpio y separado
+   • SQLAlchemy ORM (no SQL string)
+   • Fácil de testear
+   • Fácil de documentar
+
+✅ PERFORMANCE
+   • ~50ms por predicción
+   • Queries optimizadas
+   • Índices en columnas frecuentes
+   • Sin overhead significativo
+
+═════════════════════════════════════════════════════════════════════════════════
+
+📋 CHECKPOINTS DE VALIDACIÓN
+
+✓ BD PostgreSQL conectada
+  psql -U postgres -c "SELECT version();"
+
+✓ Tablas creadas
+  psql -U churn_app -d churn_predictor_db -c "\dt"
+
+✓ Dataset importado
+  psql -U churn_app -d churn_predictor_db -c "SELECT COUNT(*) FROM employees;"
+  (Debe mostrar 14999 o número de tu dataset)
+
+✓ API funcionando
+  curl http://localhost:8000/health
+
+✓ Predicción guarda en DB
+  curl -X POST http://localhost:8000/predict -d '{...}'
+  Luego: SELECT COUNT(*) FROM predictions;
+  (Debe aumentar)
+
+✓ Audit log funcional
+  SELECT * FROM audit_log ORDER BY created_at DESC;
+  (Debe tener logs de cada predicción)
+
+═════════════════════════════════════════════════════════════════════════════════
+
+🎓 CONCEPTOS APLICADOS
+
+✅ Diseño de BD relacional
+✅ SQL vs ORM (SQLAlchemy ventajas)
+✅ Foreign Keys y constraints
+✅ Índices para performance
+✅ JSONB para datos semi-estructurados
+✅ Timestamps para auditoría
+✅ Permisos de base de datos
+✅ Connection pooling
+✅ Transacciones (ACID)
+✅ Integridad referencial
+
+═════════════════════════════════════════════════════════════════════════════════
+
+✅ ÉTAPE 4 COMPLETADA!
+
+Lo que conseguiste:
+
+1. ✅ API REST profesional (ÉTAPE 3)
+2. ✅ Base de datos relacional (ÉTAPE 4) ← AQUÍ
+3. ✅ Trazabilidad completa
+4. ✅ Auditoría automática
+5. ✅ Seguridad implementada
+
+Próximo: ÉTAPE 5 - Deployment en producción (Docker + CI/CD)
+
+═════════════════════════════════════════════════════════════════════════════════
