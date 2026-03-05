@@ -223,6 +223,55 @@ git clone <URL-du-repo>
 cd projet-4-churn-prediction-hr
 
 # 2. Créer l'environnement virtuel
+Pandas : Manipulation de données
+
+Numpy : Calculs numériques
+
+Joblib : Sérialisation modèles
+
+Gradio : Interface utilisateur
+
+Hugging Face Spaces : Hébergement gratuit
+
+Architecture
+text
+┌─────────────────┐
+│   Données Input │
+└────────┬────────┘
+         │
+    ┌────▼────┐
+    │  Scaler │ (Normalisation)
+    └────┬────┘
+         │
+    ┌────▼──────────┐
+    │  LR Model     │ (Prédiction)
+    └────┬──────────┘
+         │
+    ┌────▼────────────┐
+    │ Seuil Optimal   │ (Classification)
+    └────┬────────────┘
+         │
+    ┌────▼──────────┐
+    │  Résultat     │
+    └───────────────┘
+📊 Métriques du Modèle
+Accuracy : ~95%
+
+Precision : Élevée (peu de faux positifs)
+
+Recall : Optimisé (captures maximum de churn réels)
+
+AUC-ROC : Excellent discriminant
+
+Threshold : 0.5 (seuil de probabilité)
+
+📋 Installation Locale (Développement)
+bash
+# 1. Cloner le repository
+git clone https://huggingface.co/spaces/TON_USERNAME/churn-predictor](https://huggingface.co/spaces/josibra/churn-predictor
+cd churn-predictor
+
+# 2. Créer un environnement virtuel
 python -m venv venv
 venv\Scripts\activate  # Windows
 source venv/bin/activate  # macOS/Linux
@@ -242,6 +291,13 @@ python main_api.py
 ```
 
 ### Points d'accès
+# 5. Accéder à l'interface
+# http://localhost:7860
+🌐 Accès en Ligne
+L'application est disponible sur Hugging Face Spaces :
+[https://huggingface.co/spaces/TON_USERNAME/churn-predictor](https://huggingface.co/spaces/josibra/churn-predictor)
+🎓 Données d'Entraînement
+Source : Système d'Information Ressources Humaines (SIRH)
 
 - **API** : `http://127.0.0.1:8000`
 - **Docs Swagger** : `http://127.0.0.1:8000/docs`
