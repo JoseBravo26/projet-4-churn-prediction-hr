@@ -316,6 +316,19 @@ Les tests unitaires et fonctionnels sont implémentés avec **Pytest** :
 - **`tests/test_api.py`** : tests fonctionnels des endpoints (`/health`, `/predict`, `/test-prediction`, `/predict-bulk`)
 - **`tests/test_smoke.py`** : test de base du modèle (chargement et inférence)
 
+## Intégration Continue (CI)
+
+Une CI GitHub Actions est configurée dans `.github/workflows/ci.yml` :
+
+- Déclenchement sur `push` (branches `main`, `develop`) et `pull_request` vers `main`.
+- Environnement : `ubuntu-latest`, Python 3.10.
+- Étapes :
+  - Installation des dépendances (requirements + pytest + psycopg2-binary).
+  - Exécution de la suite de tests `pytest -q`.
+
+Tous les commits doivent passer la CI avant d’être fusionnés sur `main`.
+
+
 ### Exécuter les tests
  une fois lance l'API, dans autre terminal
 ```bash
