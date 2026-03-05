@@ -15,7 +15,11 @@ import numpy as np
 from enum import Enum
 import uvicorn
 import warnings
-import psycopg2
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+
 from psycopg2.extras import RealDictCursor
 
 warnings.filterwarnings('ignore')
@@ -25,10 +29,8 @@ warnings.filterwarnings('ignore')
 # ========================================
 
 def get_db_connection():
-    """
-    Retourne une connexion PostgreSQL vers churn_predictor_db.
-    À ADAPTER si ton mot de passe change.
-    """
+    if psycopg2 is None:
+        raise RuntimeError("psycopg2 n'est pas disponible (ex. en CI), la connexion BDD est désactivée.")
     conn = psycopg2.connect(
         dbname="churn_predictor_db",
         user="churn_app",
@@ -36,9 +38,9 @@ def get_db_connection():
         host="localhost",
         port=5432,
     )
-    # Forcer une encodage compatible avec Windows / PostgreSQL
     conn.set_client_encoding("LATIN1")
     return conn
+
 
 
 # ========================================
