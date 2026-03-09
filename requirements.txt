@@ -9,4 +9,5 @@ websockets>=10.4
 pydantic>=2.11.10
 python-multipart>=0.0.18
 requests==2.31.0
-psycopg2-binary
+psycopg2-binary ==2.9.6
+pytest==7.4.0

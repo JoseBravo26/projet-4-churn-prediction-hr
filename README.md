@@ -268,7 +268,7 @@ Threshold : 0.5 (seuil de probabilité)
 📋 Installation Locale (Développement)
 bash
 # 1. Cloner le repository
-git clone https://huggingface.co/spaces/TON_USERNAME/churn-predictor](https://huggingface.co/spaces/josibra/churn-predictor
+git clone https://huggingface.co/spaces/josibra/churn-predictor](https://huggingface.co/spaces/josibra/churn-predictor
 cd churn-predictor
 
 # 2. Créer un environnement virtuel
@@ -295,7 +295,7 @@ python main_api.py
 # http://localhost:7860
 🌐 Accès en Ligne
 L'application est disponible sur Hugging Face Spaces :
-[https://huggingface.co/spaces/TON_USERNAME/churn-predictor](https://huggingface.co/spaces/josibra/churn-predictor)
+[https://huggingface.co/spaces/josibra/churn-predictor](https://huggingface.co/spaces/josibra/churn-predictor)
 🎓 Données d'Entraînement
 Source : Système d'Information Ressources Humaines (SIRH)
 
