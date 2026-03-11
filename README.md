@@ -132,39 +132,54 @@ Prédiction d'un employé individuel.
 
 **Body** :
 ```json
+curl http://127.0.0.1:8000/info-modele
 {
-  "age": 35,
-  "education_level": 3,
-  "distance_from_home": 15,
-  "experience_count": 2,
-  "total_experience": 10,
-  "years_in_company": 5,
-  "years_in_role": 2,
-  "previous_evaluation": 3,
-  "current_evaluation": 4,
-  "hierarchy_level": 2,
-  "subordinates_count": 3,
-  "environment_satisfaction": 3,
-  "job_satisfaction": 4,
-  "team_satisfaction": 3,
-  "worklife_balance_satisfaction": 3,
-  "monthly_revenue": 3500,
-  "last_raise_percentage": 11,
-  "overtime": false,
-  "stock_option_level": 1,
-  "trainings_completed": 2,
-  "years_since_promotion": 2,
-  "years_with_current_manager": 2
+  "age": 18,
+  "genre": "Masculin",
+  "etat_civil": "Celibataire",
+  "salaire": 1,
+  "distance": 0,
+  "departement": "Consulting",
+  "domaine_etude": "Entrepreunariat",
+  "niveau_hierarchique": 1,
+  "poste_freq_deplacement": "Rare",
+  "emplois_precedents": 0,
+  "experience_totale": 0,
+  "annees_entreprise": 0,
+  "annees_poste": 0,
+  "annees_derniere_promotion": 0,
+  "annees_responsable_actuel": 0,
+  "heures_semaine": 1,
+  "heures_supplementaires": false,
+  "employes_supervision": 0,
+  "evaluation_precedente": 1,
+  "evaluation_actuelle": 1,
+  "satisfaction_environnement": 1,
+  "satisfaction_travail": 1,
+  "satisfaction_equipe": 1,
+  "satisfaction_balance": 1,
+  "augmentation_salaire": 0,
+  "participation_pee": 0,
+  "formations_completees": 0
 }
 ```
 
 **Réponse** :
 ```json
 {
-  "risk_level": "Faible",
-  "churn_probability": 0.15,
-  "threshold_applied": 0.5,
-  "recommendation": "Maintenir la relation positive, surveiller satisfactions"
+  "prediction": "Risque Élevé",
+  "probabilite_abandon": 97.72,
+  "seuil_applique": 59.05,
+  "confiance_modele": 97.72,
+  "recommandation": "Intervention immédiate recommandée (augmentation, promotion, avantages, télétravail, etc.).",
+  "details": {
+    "prob_rester": 2.28,
+    "prob_partir": 97.72,
+    "satisfaction_moyenne": 1,
+    "salaire": 1,
+    "departement": "Consulting",
+    "anciennete_ans": 0
+  }
 }
 ```
 

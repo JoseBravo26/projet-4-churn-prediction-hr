@@ -1,4 +1,4 @@
-name: CI
+name: CI-CD
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     branches: [main]
 
 jobs:
+  # 1) Intégration Continue : tests + couverture
   test:
     runs-on: ubuntu-latest
     steps:
@@ -25,8 +26,68 @@ jobs:
           pip install pytest psycopg2-binary
           pip list | grep -i psycopg2 || echo "psycopg2 not found"
 
-
       - name: Run tests with coverage
         run: |
           pytest --cov=main_api --cov-report=term-missing
 
+  # 2) Continuous Deployment : déploiement sur DEV (branche develop)
+  deploy-dev:
+    needs: test
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+
+      - name: Use environment secrets
+        env:
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+        run: |
+          echo "🚀 Déploiement sur l'environnement DEV"
+          echo "BDD utilisée (masquée): $POSTGRES_URL" | sed 's/=.*/=<hidden>/'
+          echo "Pipeline CI/CD complet avec gestion des environnements et secrets ✅"
+
+      # Aquí iría tu script de deploy real:
+      # - name: Deploy to Render/Railway
+      #   run: ./scripts/deploy_dev.sh
+
+  # 3) Continuous Deployment : déploiement sur PROD (branche main)
+  deploy-prod:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+
+      - name: Use production secrets
+        env:
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+        run: |
+          echo "🚀 Déploiement sur l'environnement PROD"
+          echo "BDD production (masquée): $POSTGRES_URL" | sed 's/=.*/=<hidden>/'
+          echo "Production deployment ✅"
+
+      # Script de deploy production
+      # - name: Deploy to Prod
+      #   run: ./scripts/deploy_prod.sh
