@@ -219,7 +219,7 @@ Prédictions en masse pour une liste d'employés.
 
 ```bash
 # 1. Cloner le repo
-git clone <URL-du-repo>
+git clone https://github.com/JoseBravo26/projet-4-churn-prediction-hr.git
 cd projet-4-churn-prediction-hr
 
 # 2. Créer l'environnement virtuel
@@ -268,7 +268,7 @@ Threshold : 0.5 (seuil de probabilité)
 📋 Installation Locale (Développement)
 bash
 # 1. Cloner le repository
-git clone https://huggingface.co/spaces/josibra/churn-predictor](https://huggingface.co/spaces/josibra/churn-predictor
+git clone https://huggingface.co/spaces/josibra/churn-predictor
 cd churn-predictor
 
 # 2. Créer un environnement virtuel

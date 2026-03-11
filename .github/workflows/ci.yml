@@ -26,5 +26,7 @@ jobs:
           pip list | grep -i psycopg2 || echo "psycopg2 not found"
 
 
-      - name: Run tests
-        run: pytest -q
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=main_api --cov-report=term-missing
+
