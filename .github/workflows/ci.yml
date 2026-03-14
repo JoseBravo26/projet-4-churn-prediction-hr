@@ -1,93 +1,71 @@
-name: CI-CD
+name: CI + CD
 
 on:
   push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+    branches: [ develop ]
 
 jobs:
-  # 1) Intégration Continue : tests + couverture
-  test:
+  tests:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: 📥 Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: 🐍 Installer Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Install deps
+      - name: 📦 Installer les dépendances
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest psycopg2-binary
-          pip list | grep -i psycopg2 || echo "psycopg2 not found"
-
-      - name: Run tests with coverage
+      
+      - name: 🧪 Lancer les tests avec couverture
         run: |
           pytest --cov=main_api --cov-report=term-missing
-
-  # 2) Continuous Deployment : déploiement sur DEV (branche develop)
-  deploy-dev:
-    needs: test
-    if: github.ref == 'refs/heads/develop'
+  
+  deploy:
+    needs: tests          # ⬅️ attend que les tests soient OK
     runs-on: ubuntu-latest
-    environment: dev
+
     steps:
-      - name: Checkout
+      - name: 📥 Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+      - name: ⚙️ Installer Git LFS
+        run: git lfs install
 
-      - name: Install deps
-        run: |
-          pip install -r requirements.txt
-
-      - name: Use environment secrets
+      - name: 🚀 Déployer vers le Space Hugging Face
         env:
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ secrets.HF_SPACE_ID }}
         run: |
-          echo "🚀 Déploiement sur l'environnement DEV"
-          echo "BDD utilisée (masquée): $POSTGRES_URL" | sed 's/=.*/=<hidden>/'
-          echo "Pipeline CI/CD complet avec gestion des environnements et secrets ✅"
+          echo "Clonage du Space Hugging Face..."
+          git clone https://huggingface.co/spaces/${HF_SPACE_ID} space_repo
 
-      # Aquí iría tu script de deploy real:
-      # - name: Deploy to Render/Railway
-      #   run: ./scripts/deploy_dev.sh
+          echo "Copie des fichiers du dépôt GitHub vers le Space..."
+          rsync -av --delete ./ space_repo/ \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'space_repo' \
+            --exclude 'notebooks' \
+            --exclude '*.png' \
+            --exclude '*.jpg'
 
-  # 3) Continuous Deployment : déploiement sur PROD (branche main)
-  deploy-prod:
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+          cd space_repo
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+          echo "Configuration de Git..."
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
 
-      - name: Install deps
-        run: |
-          pip install -r requirements.txt
-
-      - name: Use production secrets
-        env:
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-        run: |
-          echo "🚀 Déploiement sur l'environnement PROD"
-          echo "BDD production (masquée): $POSTGRES_URL" | sed 's/=.*/=<hidden>/'
-          echo "Production deployment ✅"
-
-      # Script de deploy production
-      # - name: Deploy to Prod
-      #   run: ./scripts/deploy_prod.sh
+          echo "Vérification des changements..."
+          if ! git diff --quiet; then
+            git add .
+            git commit -m "Déploiement automatique depuis CI (branche develop)"
+            git push https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}.git
+          else:
+            echo "Aucun changement à déployer."
+          fi
