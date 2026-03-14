@@ -5,7 +5,6 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
-#test
 # ========================================
 # 📦 CHARGER MODÈLE, SCALER ET SEUIL
 # ========================================
