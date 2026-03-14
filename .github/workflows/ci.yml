@@ -65,6 +65,6 @@ jobs:
             git add .
             git commit -m "Déploiement automatique depuis GitHub Actions (branche main)"
             git push https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}.git
-          else:
+          else
             echo "Aucun changement à déployer."
           fi
