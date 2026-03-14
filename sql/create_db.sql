@@ -23,15 +23,41 @@ END$$;
 
 -- 4) Crear tablas
 
-CREATE TABLE IF NOT EXISTS employees (
+DROP TABLE IF EXISTS employees CASCADE;
+
+CREATE TABLE employees (
     id SERIAL PRIMARY KEY,
     age INTEGER NOT NULL,
-    genre VARCHAR(1) NOT NULL,
+    genre VARCHAR(20) NOT NULL,
+    etat_civil VARCHAR(20) NOT NULL,
     salaire NUMERIC(10,2) NOT NULL,
-    anciennete NUMERIC(5,2) NOT NULL,
-    satisfaction NUMERIC(4,2) NOT NULL,
-    turnover BOOLEAN NOT NULL
+    distance NUMERIC(6,2) NOT NULL,
+    departement VARCHAR(50) NOT NULL,
+    domaine_etude VARCHAR(50) NOT NULL,
+    niveau_hierarchique INTEGER NOT NULL,
+    poste_freq_deplacement VARCHAR(20) NOT NULL,
+    emplois_precedents INTEGER NOT NULL,
+    experience_totale NUMERIC(5,2) NOT NULL,
+    annees_entreprise NUMERIC(5,2) NOT NULL,
+    annees_poste NUMERIC(5,2) NOT NULL,
+    annees_derniere_promotion NUMERIC(5,2) NOT NULL,
+    annees_responsable_actuel NUMERIC(5,2) NOT NULL,
+    heures_semaine NUMERIC(5,2) NOT NULL,
+    heures_supplementaires BOOLEAN NOT NULL,
+    employes_supervision INTEGER NOT NULL,
+    evaluation_precedente INTEGER NOT NULL,
+    evaluation_actuelle INTEGER NOT NULL,
+    satisfaction_environnement INTEGER NOT NULL,
+    satisfaction_travail INTEGER NOT NULL,
+    satisfaction_equipe INTEGER NOT NULL,
+    satisfaction_balance INTEGER NOT NULL,
+    augmentation_salaire NUMERIC(5,2) NOT NULL,
+    participation_pee INTEGER NOT NULL,
+    formations_completees INTEGER NOT NULL,
+    turnover BOOLEAN NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
 );
+
 
 CREATE TABLE IF NOT EXISTS predictions (
     id SERIAL PRIMARY KEY,

@@ -383,6 +383,7 @@ def faire_prediction(employee: EmployeeInput) -> PredictionResponse:
         cur = conn.cursor()
 
         # 3a. Employees
+            
         satisfaction_moy = float(
             np.mean(
                 [
@@ -396,18 +397,78 @@ def faire_prediction(employee: EmployeeInput) -> PredictionResponse:
 
         cur.execute(
             """
-            INSERT INTO employees (age, genre, salaire, anciennete, satisfaction, turnover)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id) DO NOTHING
+            INSERT INTO employees (
+                age,
+                genre,
+                etat_civil,
+                salaire,
+                distance,
+                departement,
+                domaine_etude,
+                niveau_hierarchique,
+                poste_freq_deplacement,
+                emplois_precedents,
+                experience_totale,
+                annees_entreprise,
+                annees_poste,
+                annees_derniere_promotion,
+                annees_responsable_actuel,
+                heures_semaine,
+                heures_supplementaires,
+                employes_supervision,
+                evaluation_precedente,
+                evaluation_actuelle,
+                satisfaction_environnement,
+                satisfaction_travail,
+                satisfaction_equipe,
+                satisfaction_balance,
+                augmentation_salaire,
+                participation_pee,
+                formations_completees,
+                turnover
+            )
+            VALUES (
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,
+                %s,%s,%s,
+                %s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,
+                %s
+            )
             RETURNING id;
             """,
             (
                 employee.age,
                 employee.genre.value,
+                employee.etat_civil.value,
                 float(employee.salaire),
+                float(employee.distance),
+                employee.departement.value,
+                employee.domaine_etude.value,
+                employee.niveau_hierarchique,
+                employee.poste_freq_deplacement.value,
+                employee.emplois_precedents,
+                float(employee.experience_totale),
                 float(employee.annees_entreprise),
-                satisfaction_moy,
-                bool(prediction_flag),
+                float(employee.annees_poste),
+                float(employee.annees_derniere_promotion),
+                float(employee.annees_responsable_actuel),
+                float(employee.heures_semaine),
+                bool(employee.heures_supplementaires),
+                employee.employes_supervision,
+                employee.evaluation_precedente,
+                employee.evaluation_actuelle,
+                employee.satisfaction_environnement,
+                employee.satisfaction_travail,
+                employee.satisfaction_equipe,
+                employee.satisfaction_balance,
+                float(employee.augmentation_salaire),
+                employee.participation_pee,
+                employee.formations_completees,
+                bool(prediction_flag),  # True si riesgo alto
             ),
         )
         result = cur.fetchone()
