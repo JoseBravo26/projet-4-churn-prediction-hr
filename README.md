@@ -1,3 +1,16 @@
+---
+title: Prédicteur de Churn des Employés
+emoji: 👥
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: "6.6.0"
+python_version: "3.10"
+app_file: app.py
+pinned: false
+---
+
+
 # 👥 Prédicteur de Churn des Employés
 
 **Status** : ✅ Production Ready | **Version** : 1.0.0 | **Dernière mise à jour** : Mars 2026
